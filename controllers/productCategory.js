@@ -1,4 +1,5 @@
 import { PrismaClient } from "../generated/prisma/index.js";
+import { logQueryExplanation } from "../utils/queryExplainer.js";
 
 const prisma = new PrismaClient();
 
@@ -17,6 +18,8 @@ export const createProduct = async (req, res) => {
     if (!req.body.categoryId) {
       return res.status(400).json({ error: "Category ID is required" });
     } else {
+      // Query: SELECT * FROM Category WHERE id = ? - Validate foreign key constraint
+      logQueryExplanation("findUniqueCategory", { operation: "validate FK", categoryId: req.body.categoryId });
       const categoryExists = await prisma.category.findUnique({
         where: {
           id: parseInt(req.body.categoryId),
@@ -28,6 +31,12 @@ export const createProduct = async (req, res) => {
       }
     }
 
+    // Query: INSERT INTO Product (name, price, categoryId, ...) VALUES (?, ?, ?, ...)
+    logQueryExplanation("createProduct", { 
+      name: req.body.name, 
+      price: req.body.price, 
+      categoryId: req.body.categoryId 
+    });
     const newProduct = await prisma.product.create({
       data: {
         name: req.body.name,
@@ -52,6 +61,11 @@ export const createProduct = async (req, res) => {
 
 export const getAllProducts = async (req, res) => {
   try {
+    // Query: SELECT p.*, c.name FROM Product p LEFT JOIN Category c ON p.categoryId = c.id ORDER BY p.createdAt DESC
+    logQueryExplanation("findManyProducts", { 
+      includes: "category relationship", 
+      orderBy: "createdAt DESC" 
+    });
     const products = await prisma.product.findMany({
       //include fields from the related category
       include: {
@@ -72,6 +86,8 @@ export const getAllProducts = async (req, res) => {
       },
     });
 
+    // Query: SELECT COUNT(*) FROM Product - Get total product count
+    logQueryExplanation("countProducts");
     const productsCount = await prisma.product.count();
 
     return res.status(200).json({
@@ -90,6 +106,8 @@ export const getProductByIdOrName = async (req, res) => {
     let product;
 
     if (req.query.id) {
+      // Query: SELECT p.*, c.name FROM Product p LEFT JOIN Category c ON p.categoryId = c.id WHERE p.id = ?
+      logQueryExplanation("findUniqueProduct", { searchBy: "id", value: req.query.id });
       product = await prisma.product.findUnique({
         where: {
           id: parseInt(req.query.id),
@@ -103,6 +121,8 @@ export const getProductByIdOrName = async (req, res) => {
         },
       });
     } else if (req.query.name) {
+      // Query: SELECT p.*, c.name FROM Product p LEFT JOIN Category c ON p.categoryId = c.id WHERE p.name = ?
+      logQueryExplanation("findUniqueProduct", { searchBy: "name", value: req.query.name });
       product = await prisma.product.findUnique({
         where: {
           name: req.query.name,
@@ -141,6 +161,8 @@ export const updateProduct = async (req, res) => {
       return res.status(400).json({ error: "Valid product ID is required" });
     }
 
+    // Query: SELECT * FROM Product WHERE id = ? - Verify product exists before update
+    logQueryExplanation("findUniqueProduct", { operation: "verify exists", id: productId });
     const existingProduct = await prisma.product.findUnique({
       where: {
         id: productId,
@@ -167,6 +189,8 @@ export const updateProduct = async (req, res) => {
 
     if (req.body.categoryId !== undefined) {
       const categoryId = parseInt(req.body.categoryId);
+      // Query: SELECT * FROM Category WHERE id = ? - Validate new category exists
+      logQueryExplanation("findUniqueCategory", { operation: "validate new FK", categoryId });
       const categoryExists = await prisma.category.findUnique({
         where: { id: categoryId },
       });
@@ -178,6 +202,12 @@ export const updateProduct = async (req, res) => {
       updateData.categoryId = categoryId;
     }
 
+    // Query: UPDATE Product SET [fields], updatedAt = NOW() WHERE id = ? RETURNING * with JOIN
+    logQueryExplanation("updateProduct", { 
+      id: productId, 
+      fieldsUpdated: Object.keys(updateData),
+      includesCategory: true 
+    });
     const updatedProduct = await prisma.product.update({
       where: {
         id: productId,
@@ -210,6 +240,8 @@ export const deleteProduct = async (req, res) => {
       return res.status(400).json({ error: "Valid product ID is required" });
     }
 
+    // Query: SELECT * FROM Product WHERE id = ? - Verify product exists before deletion
+    logQueryExplanation("findUniqueProduct", { operation: "verify before delete", id: productId });
     const productExists = await prisma.product.findUnique({
       where: { id: productId },
     });
@@ -218,6 +250,8 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ error: "Product not found" });
     }
 
+    // Query: DELETE FROM Product WHERE id = ? RETURNING *
+    logQueryExplanation("deleteProduct", { id: productId });
     const deletedProduct = await prisma.product.delete({
       where: {
         id: productId,
@@ -240,6 +274,9 @@ export const getProductByCategory = async (req, res) => {
     if (!categoryId || isNaN(categoryId)) {
       return res.status(400).json({ error: "Valid category ID is required" });
     }
+    
+    // Query: SELECT * FROM Category WHERE id = ? - Verify category exists
+    logQueryExplanation("findUniqueCategory", { operation: "verify category", id: categoryId });
     if (
       !(await prisma.category.findUnique({
         where: { id: categoryId },
@@ -248,6 +285,11 @@ export const getProductByCategory = async (req, res) => {
       return res.status(404).json({ error: "Category not found" });
     }
 
+    // Query: SELECT * FROM Product WHERE categoryId = ? ORDER BY name ASC
+    logQueryExplanation("findProductsByCategory", { 
+      categoryId, 
+      orderBy: "name ASC" 
+    });
     const products = await prisma.product.findMany({
       where: {
         categoryId: categoryId,
@@ -263,6 +305,8 @@ export const getProductByCategory = async (req, res) => {
         .json({ message: "No products found in this category" });
     }
 
+    // Query: SELECT COUNT(*) FROM Product WHERE categoryId = ?
+    logQueryExplanation("countProducts", { categoryId });
     const productsCount = await prisma.product.count({
       where: {
         categoryId: categoryId,

@@ -8,24 +8,28 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Category table: Stores product categories with unique names and audit timestamps
+// SQL: CREATE TABLE "Category" (id SERIAL PRIMARY KEY, name VARCHAR UNIQUE, createdAt TIMESTAMP, updatedAt TIMESTAMP)
 model Category {
-  id        Int       @id @default(autoincrement())
-  name      String    @unique
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @updatedAt
-  products  Product[]
+  id        Int       @id @default(autoincrement()) // Auto-incrementing primary key for efficient indexing
+  name      String    @unique                       // Unique constraint prevents duplicate category names
+  createdAt DateTime  @default(now())               // Audit trail: record creation timestamp
+  updatedAt DateTime  @updatedAt                    // Audit trail: automatic update timestamp
+  products  Product[]                               // One-to-many relationship: Category can have multiple Products
 }
 
+// Product table: Stores product information with foreign key relationship to Category
+// SQL: CREATE TABLE "Product" (id SERIAL PRIMARY KEY, name VARCHAR UNIQUE, price DECIMAL, categoryId INTEGER REFERENCES "Category"(id))
 model Product {
-  id          Int      @id @default(autoincrement())
-  name        String   @unique
-  description String?
-  price       Decimal  @default(0.0)
-  currency    String   @default("USD")
-  quantity    Int      @default(0)
-  available   Boolean  @default(true)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @updatedAt
-  categoryId  Int
-  category    Category @relation(fields: [categoryId], references: [id])
+  id          Int      @id @default(autoincrement()) // Auto-incrementing primary key for efficient lookups
+  name        String   @unique                       // Unique product names prevent duplicates
+  description String?                                // Optional product description (nullable field)
+  price       Decimal  @default(0.0)                // Decimal type ensures precise currency calculations
+  currency    String   @default("USD")               // Currency code with USD default for internationalization
+  quantity    Int      @default(0)                   // Inventory tracking with zero default
+  available   Boolean  @default(true)                // Product availability flag for business logic
+  createdAt   DateTime @default(now())               // Audit trail: record creation timestamp
+  updatedAt   DateTime @updatedAt                    // Audit trail: automatic update timestamp
+  categoryId  Int                                    // Foreign key to Category table (NOT NULL by default)
+  category    Category @relation(fields: [categoryId], references: [id]) // Explicit foreign key constraint with referential integrity
 }
