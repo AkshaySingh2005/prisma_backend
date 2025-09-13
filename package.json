@@ -1,14 +1,16 @@
 {
   "name": "prisma_nodejs",
   "version": "1.0.0",
-  "description": "",
-  "main": "index.js",
+  "description": "Node.js Express backend with Prisma ORM providing PostgreSQL query explanations",
+  "main": "server.js",
   "type": "module",
   "scripts": {
     "dev": "nodemon server.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "start": "node server.js",
+    "demo": "node demo/queryExplanationDemo.js",
+    "test": "node tests/queryExplainerTest.js"
   },
-  "keywords": [],
+  "keywords": ["prisma", "postgresql", "express", "crud", "query-explanations"],
   "author": "",
   "license": "ISC",
   "dependencies": {
